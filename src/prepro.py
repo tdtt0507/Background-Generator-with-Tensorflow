@@ -1,9 +1,12 @@
+import tensorflow as tf
 import os
-import numpy as np
+import argparse as _argparse
 from PIL import Image
+import numpy as np
 import collections
 import copy
 import random
+from tqdm import tqdm
 
 def list_check(src, dst):
     if len(src) != len(dst):
@@ -93,19 +96,14 @@ def augment_image(dataset, image, obj_info, num, cnt):
     possible = {'up':0,'down':0,'left':0,'right':0} # [상, 하, 좌, 우]
     image_pix = np.array(image)
     img_info = {'x':0, 'y':0, 'w':len(image_pix[0]), 'h':len(image_pix)}
-    print(obj_info)
+    
     min_gen = 150
-    # 최소 여백 부분을 150, 최소 생성 부분 50, 따라서 200으로 설정
+    # 최소 여백 부분을 100, 최소 생성 부분 50, 따라서 150으로 설정
     possible['up'] = 1 if obj_info['y'] > min_gen else 0
     possible['down'] = 1 if obj_info['y'] + obj_info['h'] + min_gen < img_info['h'] else 0
     possible['left'] = 1 if obj_info['x'] > min_gen else 0
     possible['right'] = 1 if obj_info['x'] + obj_info['w'] + min_gen < img_info['w'] else 0
 
-    print('============ produce_tfrecord ============')
-    print('Object Image \n X : ' +  str(obj_info['x']) + '\n Y : ' + str(obj_info['y']) + '\n Width : ' + str(obj_info['w']) + '\n Height : ' + str(obj_info['h']) )
-    print('Input  Image \n X : 0 \n Y : 0 \n Width : ' + str(img_info['w']) + ' \n Height : ' + str(img_info['h']) + '\n' )
-    print('==========================================')
-    print(possible)
     x_data_s = list()
     y_data_s = list()
 
@@ -121,7 +119,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
 
             output_pix, t_obj_info = setting_etc(image_pix, plus_info, t_obj_info)
             input_pix = copy.deepcopy(output_pix)
-            erase_area = random.randrange(0, t_obj_info['y'] - 100)
+            erase_area = random.randrange(50, t_obj_info['y'] - 100)
             input_pix[: erase_area, : ] = 0
             im_input = Image.fromarray(input_pix)
             im_output = Image.fromarray(output_pix)
@@ -129,7 +127,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
             y_file = dataset + '/image_Y_' + str(cnt) + '.bmp'
             im_input.save( x_file )
             im_output.save( y_file )
-            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info})
+            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info, 'zero':'up', 'id':cnt})
             cnt += 1
     
     if possible['down']: # 아래로만 생성 데이터
@@ -142,7 +140,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
 
             output_pix, t_obj_info = setting_etc(image_pix, plus_info, t_obj_info)
             input_pix = copy.deepcopy(output_pix)
-            erase_area = random.randrange(0, len(output_pix) - 100 - t_obj_info['h'] - t_obj_info['y'])
+            erase_area = random.randrange(50, len(output_pix) - 100 - t_obj_info['h'] - t_obj_info['y'])
             input_pix[ len(output_pix) - erase_area: , : ] = 0
             im_input = Image.fromarray(input_pix)
             im_output = Image.fromarray(output_pix)
@@ -150,7 +148,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
             y_file = dataset + '/image_Y_' + str(cnt) + '.bmp'
             im_input.save( x_file )
             im_output.save( y_file )
-            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info})
+            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info, 'zero':'down', 'id':cnt})
             cnt += 1
     
     if possible['left']:# 왼으로만 생성 데이터
@@ -163,7 +161,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
 
             output_pix, t_obj_info = setting_etc(image_pix, plus_info, t_obj_info)
             input_pix  = copy.deepcopy(output_pix)
-            erase_area = random.randrange(0, t_obj_info['x'] - 100)
+            erase_area = random.randrange(50, t_obj_info['x'] - 100)
             input_pix[:, :erase_area ] = 0
 
             im_input  = Image.fromarray(input_pix)
@@ -172,7 +170,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
             y_file = dataset + '/image_Y_' + str(cnt) + '.bmp'
             im_input.save( x_file )
             im_output.save( y_file )
-            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info})
+            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info, 'zero': 'left', 'id':cnt})
             cnt += 1
     
     if possible['right']:
@@ -185,13 +183,7 @@ def augment_image(dataset, image, obj_info, num, cnt):
 
             output_pix, t_obj_info = setting_etc(image_pix, plus_info, t_obj_info)
             input_pix = copy.deepcopy(output_pix)
-            erase_area = random.randrange(0, len(output_pix[0]) - (t_obj_info['x'] + t_obj_info['w'] + 100) )
-            print('-------output_pix[0]-------')
-            print(np.shape(input_pix))
-            print(len(output_pix[0]))
-            print('-------erase_area-----------')
-            print(erase_area)
-            print('---------------------')
+            erase_area = random.randrange(50, len(output_pix[0]) - (t_obj_info['x'] + t_obj_info['w'] + 100) )
             input_pix[:, len(output_pix[0]) - erase_area : ] = 0
             im_input = Image.fromarray(input_pix)
             im_output = Image.fromarray(output_pix)
@@ -199,21 +191,15 @@ def augment_image(dataset, image, obj_info, num, cnt):
             y_file = dataset + '/image_Y_' + str(cnt) + '.bmp'
             im_input.save( x_file )
             im_output.save( y_file )
-            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info})
+            data_bundle.append({'X': x_file, 'Y':y_file, 'obj_info' : t_obj_info, 'zero':'right', 'id':cnt})
             cnt += 1
-
     return data_bundle, cnt
-
-def produce_tf_record():
-    return None
 
 def make_tf_record(dataset, kind):
     cnt = 0
     data_list = os.listdir(dataset +'/original')
     tmp = list()
-
     input_tf = list()
-
     for data in data_list:
         if data.split("_")[1] != 'c':
             tmp.append(data)
@@ -233,38 +219,71 @@ def make_tf_record(dataset, kind):
         obj_info = obj_info_
         ## 기본적인 생성방식, N 개의 image 를 random 방식으로 잘라서 data 를 augment
         N = 10 # 데이터 증강 개수
-        tmp_tf, cnt = augment_image(dataset + '/augment', origin, obj_info, N, cnt) # 원래 이미지, 오브젝 정보, 데이터 증강 개수
-            
+        tmp_tf, cnt = augment_image(dataset + '/augment', origin, obj_info, N, cnt)             
         input_tf += tmp_tf
-
-        ## 추가구현 생성방식, N 개의 image 를 필터를 거쳐 변형시킨 이미지를 잘라서 data augment
-        #origin = filtered_v01(origin)
         N = 10
-    produce_tfrecord(input_tf)
-        
-    print(kind + ' --> tfrecord 생성 완료')
+    return input_tf
 
+def produce_tfrecord(config, examples):
+    print('Generating train.tfrecord')
+    writer = tf.python_io.TFRecordWriter(config.train_record_file)    
+    for example in examples:
+        print(example)
+        img_x = Image.open(example['X'])
+        img_y = Image.open(example['Y'])
+        np_x = np.array(img_x, dtype=np.int32)
+        np_y = np.array(img_y, dtype=np.int32)
+        obj_info = example['obj_info']
+        obj_info_ = np.array( [obj_info['x'], obj_info['y'], obj_info['w'], obj_info['h']], dtype=np.int32)
+        
+        if example['zero'] == 'up':
+            np_x = np_x[:obj_info['y'],:]
+            np_y = np_y[:obj_info['y'],:]
+            np_x = np.rot90(np_x, 3)
+            np_y = np.rot90(np_y, 3)
+        elif example['zero'] == 'down':
+            np_x = np_x[obj_info['y'] + obj_info['h']:,:]
+            np_y = np_y[obj_info['y'] + obj_info['h']:,:]
+            np_x = np.rot90(np_x, 1)
+            np_y = np.rot90(np_y, 1)
+        elif example['zero'] == 'left':
+            np_x = np_x[:,:obj_info['x']]
+            np_y = np_y[:,:obj_info['x']]
+            np_x = np.rot90(np_x, 2)
+            np_y = np.rot90(np_y, 2)
+        elif example['zero'] == 'right':
+            np_x = np_x[:, obj_info['x'] + obj_info['w']:]
+            np_y = np_y[:, obj_info['x'] + obj_info['w']:]
+        
+        end_width = 0
+        for idx, val in enumerate(np_x[0]):
+            if list_check(val,[0,0,0]):
+                end_width = idx
+                break
+        img_info = np.array( [0,0, len(np_x[0]), len(np_x) ], dtype=np.int32)
+        
+        features = tf.train.Features(feature={
+            # 실제 이미지 Location
+            "id" : tf.train.Feature(int64_list=tf.train.Int64List(value=[example['id']])),
+            # 생성할 부분만 잘린 Image Pixel
+            "c_image" : tf.train.Feature(bytes_list=tf.train.BytesList(value=[np_x.tostring()])),
+            "r_image" : tf.train.Feature(bytes_list=tf.train.BytesList(value=[np_y.tostring()])),
+            "img_info" : tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_info.tostring()])),
+            "end_width" : tf.train.Feature(int64_list=tf.train.Int64List(value=[end_width]))
+            })
+        record = tf.train.Example(features=features)
+        writer.write(record.SerializeToString())
+    writer.close()
+    
 def prepro(config):
-    print('=== prepro ===')
+
+    print('Preprocessing ... ')
     train_dir = config.train_dir
     dev_dir = config.dev_dir
     test_dir = config.test_dir
-    processed_dir = config.processed_dir
     
     # prepro 모듈 동작 시나리오
-    make_tf_record(train_dir,"Training data")
-    make_tf_record(dev_dir,"Dev data")
-    make_tf_record(test_dir,"Test data")
-    ## 
-    '''
-    에러가 있어서 향후 수정 예정, 나중에 이부분으로 작업할 예정.
-    # Raw dataset directory
-    train_file_dir = config.train_dir
-    dev_file_dir = config.dev_dir
-    test_file_dir = config.test_dir
+
+    train_input_tf = make_tf_record(train_dir,"Training data")
+    produce_tfrecord(config, train_input_tf)
     
-    # preprocessed dataset directory
-    train_record_file = config.train_record_file
-    dev_record_file = config.dev_record_file
-    test_record_file  = config.test_record_file
-    '''
