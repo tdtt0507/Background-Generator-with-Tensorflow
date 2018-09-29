@@ -35,11 +35,14 @@ def train(config):
 
         for _ in tqdm(range(1, config.num_steps + 1)):
             global_step = sess.run(model.global_step) + 1
-            c_image, img_info, end_width= sess.run(
-                [model.c_image, model.img_info, model.end_width], 
+            enc_img, res_img, dec_img, img_info, end_width= sess.run(
+                [model.enc_img, model.res_img, model.dec_img, model.img_info, model.end_width], 
                 feed_dict={handle: train_handle})
             print('========================')
-            print(img_info)
-            print(np.shape(c_image))
+            print('Encoding Image :', np.shape(enc_img))
+            print('ResNet   Image :', res_img)
+            print('Decoding Image :', np.shape(dec_img))
+            print('Model Info :', img_info)
+            print('End Width :', end_width)
             print(end_width)
             print('========================')

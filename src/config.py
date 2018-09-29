@@ -64,6 +64,12 @@ flags.DEFINE_integer("patience", 3, "Patience for lr decay")
 
 flags.DEFINE_integer('block_size', 30, "Size of Picture partitioning Block")
 
+# -------------------- Model realted Flags --------------------
+
+flags.DEFINE_integer('hidden_size', 150, "RNN hidden_size")
+flags.DEFINE_integer('cut_size', 4, "Cutting size of conved data")
+# -------------------------------------------------------------
+
 def main(_):
     config = flags.FLAGS
     if config.mode == "train":
