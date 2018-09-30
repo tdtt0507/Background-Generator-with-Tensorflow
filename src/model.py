@@ -1,5 +1,6 @@
 import tensorflow as tf
-from func import conv, bn, stack, _max_pool, activation
+import tensorflow.contrib.slim as slim
+from func import conv, bn, stack, _max_pool, activation, deconv2d, binary_crossentropy
 from rnn import my_dynamic_rnn
 
 class Model(object):
@@ -22,7 +23,8 @@ class Model(object):
         
         self.c_image = tf.reshape(self.c_image, [self.img_info[3], self.img_info[2], 3])
         self.r_image = tf.reshape(self.r_image, [self.img_info[3], self.img_info[2], 3])
-        #self.is_train = tf.get_variable("is_train", shape=[], dtype=tf.bool, trainable=False)
+        self.lr = tf.get_variable("lr", shape=[], dtype=tf.float32, trainable=False)
+        self.total_loss = tf.placeholder(tf.float32, [])
         print('Getting batch part Builded')
 
         print('Cutting & Copy Part Building ... ')
@@ -37,6 +39,19 @@ class Model(object):
         self.conv_Seq2Seq()
         print('Seq2Seq Model area Builded')
 
+        print('Deconv Model area Building ...')
+        self.deconv()
+        print('Deconv Model area Builded')
+        
+        print('loss compute area Building ...')
+        self.loss_compute()
+        print('loss compute area Builded')
+        
+        if self.is_train:
+            print('Learning Area Building ...')
+            self.learning_area()
+            print('Learning Area Builded')
+        
     def model_prepro(self):
 
         #### Cutting & Copy Data 부분
@@ -53,7 +68,7 @@ class Model(object):
         enc_img = tf.slice(self.c_image, 
                            [0,0,0], 
                            [seq_len_height * self.block_size, enc_seq_len_width * self.block_size, 3])
-
+        
         dec_img = tf.zeros(shape=[seq_len_height * dec_seq_len_width, self.block_size, self.block_size, 3], dtype=tf.float32)
         
         enc_img = tf.image.convert_image_dtype(enc_img, dtype=tf.float32)
@@ -69,6 +84,11 @@ class Model(object):
         self.enc_img = enc_img
         self.dec_img = dec_img
 
+        label_img = tf.slice(self.r_image, [0,0,0], [seq_len_height*self.block_size, self.img_info[2], 3])
+        self.label_img = label_img
+        
+        
+        
     def small_resnet(self):
 
         tmp_config = dict()
@@ -77,6 +97,7 @@ class Model(object):
         tmp_config['stride'] = 2
         tmp_config['use_bias'] = True
         input_img = self.enc_img
+        
         with tf.variable_scope('scale1'):
             input_img = conv(input_img, tmp_config)
             input_img = bn(input_img, tmp_config)
@@ -109,7 +130,8 @@ class Model(object):
     def conv_Seq2Seq(self):
 
         with tf.variable_scope('Encode'):
-            enc_cell = tf.nn.rnn_cell.LSTMCell(self.config.hidden_size)
+            
+            enc_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(self.config.hidden_size)
             if self.is_train:
                 enc_cell = tf.nn.rnn_cell.DropoutWrapper(enc_cell, output_keep_prob=0.7)
 
@@ -119,14 +141,14 @@ class Model(object):
             self.fin_output = enc_outputs
         
         with tf.variable_scope('Decode'):
-            dec_cell = tf.nn.rnn_cell.LSTMCell(self.config.hidden_size)
+            
+            dec_cell = tf.contrib.cudnn_rnn.CudnnCompatibleLSTMCell(self.config.hidden_size)
             if self.is_train:
                 dec_cell = tf.nn.rnn_cell.DropoutWrapper(dec_cell, output_keep_prob=0.7)
-            # 입력값, Sequence 길이 : dec_seq_len_width
-            # initial_state 또한 정의해줘야.
+
             sequence_length = tf.cast(self.dec_seq_len_width, tf.int32)
             dummy_zero_input = tf.zeros(shape=[self.seq_len_height, self.config.hidden_size], dtype=tf.float32)
-            #output_ta = tf.TensorArray(size=self.seq_len_height, dtype=tf.int32)
+
             
             def dec_loop_fn(time, cell_output, cell_state, loop_state):
                 emit_output = cell_output
@@ -150,21 +172,34 @@ class Model(object):
             self.emit_ta = emit_ta.stack()
             self.emit_ta = tf.transpose(self.emit_ta, [1,0,2])
             self.emit_ta = tf.reshape(self.emit_ta, [self.seq_len_height, self.dec_seq_len_width, 8, 8, 128])
-            #self.dec_img = tf.reshape(self.dec_img, [self.seq_len_height, self.dec_seq_len_width, ])
-        '''
-        with tf.variable_scope('decode'):
-            dec_cell = tf.nn.rnn_cell.LSTMCell(self.config.hidden_size)
-            if self.is_train:
-                dec_cell = tf.nn.rnn_cell.DropoutWrapper(dec_cell, output_keep_prob=0.7)
-            helper = tf.contrib.seq2seq.TrainingHelper(inputs=tf.zeros([8192], dtype=tf.float32), sequence_length=self.dec_seq_len_width)
-
-            decoder = tf.contrib.seq2seq.BasicDecoder(dec_cell, helper, enc_state )
-
-            outputs, _ = tf.contrib.seq2seq.dynamic_decode(decoder=decoder,
-                impute_finished=True, maximum_iteration=20)
-        self.res_img = outputs
-        #with tf.variable_scope("rnn") as varscope:
-        #    tf.get_variable("wi", shape=[512, self.config.hidden_size])
-
-        #emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell = cell, loop_fn = crnn_loop_fn)
-	'''
+            
+    def deconv(self):
+        self.emit_ta= tf.reshape(self.emit_ta, [self.seq_len_height* self.dec_seq_len_width,8,8,128])
+        self.emit_ta= deconv2d(self.emit_ta, output_dim=64, name="decon2d_1_img")
+        self.emit_ta= deconv2d(self.emit_ta, output_dim=3, name="decon2d_2_img")
+        self.emit_ta= tf.reshape(self.emit_ta, [self.seq_len_height, self.dec_seq_len_width, 32, 32, 3])
+        
+        self.output = tf.reshape(self.emit_ta, [self.seq_len_height * 32, -1, 3]) 
+        self.final_output = tf.concat([self.emit_ta, self.enc_img_],1)
+        self.final_output = tf.reshape( self.final_output, [self.seq_len_height * 32, -1, 3])
+        
+    def loss_compute(self):
+        x_image = tf.slice(self.output, [0,0,0], [self.seq_len_height, self.img_info[2] - self.end_width, 3])
+        y_image = tf.slice(self.r_image, [0,self.end_width,0],[self.seq_len_height, self.img_info[2] - self.end_width, 3])
+        y_image = tf.image.convert_image_dtype(y_image, dtype=tf.float32)
+        
+        cross_entropy_L = binary_crossentropy(x_image, y_image)
+        self.loss = tf.reduce_sum(cross_entropy_L)
+        # 아직 Sequence Length 도 구현 안된 상태임.
+        
+    def learning_area(self):
+        self.opt = tf.train.AdadeltaOptimizer(learning_rate=self.lr, epsilon=1e-6)
+        grads = self.opt.compute_gradients(self.loss)
+        gradients, variables = zip(*grads)
+        
+        capped_grads, _ = tf.clip_by_global_norm(
+            gradients, self.config.grad_clip)
+        
+        self.train_op = self.opt.apply_gradients(
+            zip(capped_grads, variables), global_step=self.global_step)
+        

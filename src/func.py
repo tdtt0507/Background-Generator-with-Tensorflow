@@ -1,5 +1,6 @@
 import tensorflow as tf 
 import numpy as np 
+import tensorflow.contrib.slim as slim
 from tensorflow.python.training import moving_averages
 
 MOVING_AVERAGE_DECAY = 0.9997
@@ -163,3 +164,11 @@ def _max_pool(x, ksize=3, stride=2):
                           strides=[1, stride, stride, 1],
                           padding='SAME')
 
+def deconv2d(input_, output_dim, ks=5, s=2, stddev=0.02, name="deconv2d"):
+    with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
+        return slim.conv2d_transpose(input_, output_dim, ks, s, padding='SAME', activation_fn=None,
+                                    weights_initializer=tf.truncated_normal_initializer(stddev=stddev),
+                                    biases_initializer=None)
+def binary_crossentropy(t,o):
+    eps=1e-8
+    return -(t*tf.log(o+eps) + (1.0-t)*tf.log(1.0-o+eps))

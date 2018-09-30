@@ -32,26 +32,46 @@ def train(config):
         saver = tf.train.Saver()
         train_handle = sess.run(train_iterator.string_handle())
         #sess.run(tf.assign(model.is_train, tf.constant(True, dtype=tf.bool)))
-
+        total_loss = 0.0
+        
+        sess.run(tf.assign(model.lr, tf.constant(lr, dtype=tf.float32)))
+        
         for _ in tqdm(range(1, config.num_steps + 1)):
             global_step = sess.run(model.global_step) + 1
-            res_img = sess.run([model.res_img], feed_dict={handle: train_handle})
-            print(np.shape(res_img))
             
-            enc_img, dec_img, res_img, fin_state, fin_output, emit_ta, img_info, end_width = sess.run( 
-                [model.enc_img_, model.dec_img_, model.res_img_, model.fin_state, model.fin_output, model.emit_ta, model.img_info, model.end_width], 
+            loss = sess.run( [model.loss ], feed_dict={handle: train_handle, model.total_loss : 0} )
+            print(loss)
+            total_loss += loss[0]
+            '''
+            if (global_step+1) % config.stack_batch == 0:
+                print(total_loss)
+                loss, train_op = sess.run([model.loss, model.train_op], 
+                                          feed_dict={ handle : train_handle,
+                                                      model.total_loss : total_loss })
+                total_loss = 0
+            '''                           
+            '''
+            loss, final_output, lab_img, enc_img, dec_img, res_img, fin_state, fin_output, emit_ta, img_info, end_width = sess.run( 
+                [model.loss, model.final_output, model.label_img, model.enc_img_, model.dec_img_, model.res_img_, model.fin_state, model.fin_output, model.emit_ta, model.img_info, model.end_width], 
                 feed_dict={handle: train_handle})
             
             print('========================')
             print('Image Width    :', img_info[2])
             print('Image Height   :', img_info[3])
             print('End Width      :', end_width)
+            print('label    Image :', np.shape(lab_img))
             print('Encoding Image :', np.shape(enc_img))
             print('Decoding Image :', np.shape(dec_img))
             print('ResNet   Image :', np.shape(res_img))
             print('RNN Fin  State :', np.shape(fin_state))
             print('RNN Fin Output :', np.shape(fin_output))
             print('Emit_ta Output :', np.shape(emit_ta))
+            print('Final   Output :', np.shape(final_output))
+            print('Loss           :', loss)
             #print('Model Info :', img_info)
             #print(end_width)
             print('========================')
+            '''
+            
+            
+            
