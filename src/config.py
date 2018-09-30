@@ -62,11 +62,11 @@ flags.DEFINE_float("init_lr", 0.5, "Initial Learning rate for adadelta")
 flags.DEFINE_float("keep_prob", 0.7,"Dropout rate")
 flags.DEFINE_integer("patience", 3, "Patience for lr decay")
 
-flags.DEFINE_integer('block_size', 30, "Size of Picture partitioning Block")
+flags.DEFINE_integer('block_size', 32, "Size of Picture partitioning Block")
 
 # -------------------- Model realted Flags --------------------
 
-flags.DEFINE_integer('hidden_size', 300, "RNN hidden_size")
+flags.DEFINE_integer('hidden_size', 8192, "RNN hidden_size")
 flags.DEFINE_integer('cut_size', 4, "Cutting size of conved data")
 # -------------------------------------------------------------
 

@@ -54,7 +54,7 @@ class Model(object):
                            [0,0,0], 
                            [seq_len_height * self.block_size, enc_seq_len_width * self.block_size, 3])
 
-        dec_img = tf.zeros(shape=[seq_len_height * dec_len_width, self.block_size, self.block_size, 3], dtype=tf.float32)
+        dec_img = tf.zeros(shape=[seq_len_height * dec_seq_len_width, self.block_size, self.block_size, 3], dtype=tf.float32)
         
         enc_img = tf.image.convert_image_dtype(enc_img, dtype=tf.float32)
 
@@ -64,6 +64,8 @@ class Model(object):
         self.seq_len_height = seq_len_height
         self.dec_seq_len_width = dec_seq_len_width
 
+        self.enc_img_ = tf.reshape(enc_img, [seq_len_height, enc_seq_len_width, self.block_size, self.block_size, 3])
+        self.dec_img_ = tf.reshape(dec_img, [seq_len_height, dec_seq_len_width, self.block_size, self.block_size, 3])
         self.enc_img = enc_img
         self.dec_img = dec_img
 
@@ -102,7 +104,7 @@ class Model(object):
         config = self.config
 
         self.res_img = input_img
-
+        self.res_img_ = tf.reshape(input_img, [self.seq_len_height, self.enc_seq_len_width, 8,8,128])
 
     def conv_Seq2Seq(self):
 
@@ -113,13 +115,42 @@ class Model(object):
 
             self.res_img = tf.reshape(self.res_img, [self.seq_len_height, self.enc_seq_len_width, 8192])
             enc_outputs, enc_state = tf.nn.dynamic_rnn(enc_cell, self.res_img, dtype=tf.float32)
-
+            self.fin_state = enc_state
+            self.fin_output = enc_outputs
+        
         with tf.variable_scope('Decode'):
             dec_cell = tf.nn.rnn_cell.LSTMCell(self.config.hidden_size)
             if self.is_train:
                 dec_cell = tf.nn.rnn_cell.DropoutWrapper(dec_cell, output_keep_prob=0.7)
+            # 입력값, Sequence 길이 : dec_seq_len_width
+            # initial_state 또한 정의해줘야.
+            sequence_length = tf.cast(self.dec_seq_len_width, tf.int32)
+            dummy_zero_input = tf.zeros(shape=[self.seq_len_height, self.config.hidden_size], dtype=tf.float32)
+            #output_ta = tf.TensorArray(size=self.seq_len_height, dtype=tf.int32)
+            
+            def dec_loop_fn(time, cell_output, cell_state, loop_state):
+                emit_output = cell_output
 
-            self.dec_img = tf.reshape(self.dec_img, [self.seq_len_height, self.dec_seq_len_width, ])
+                if cell_output is None:
+                    next_cell_state = enc_state
+                    next_input = dummy_zero_input
+                else:
+                    next_cell_state = cell_state
+                    next_input = cell_output
+                
+                elements_finished = (time >= sequence_length)
+                finished = tf.reduce_all(elements_finished)
+                next_loop_state = None
+                
+                return (elements_finished, next_input, next_cell_state,
+                        emit_output, next_loop_state)
+            
+            emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(dec_cell, dec_loop_fn)
+            
+            self.emit_ta = emit_ta.stack()
+            self.emit_ta = tf.transpose(self.emit_ta, [1,0,2])
+            self.emit_ta = tf.reshape(self.emit_ta, [self.seq_len_height, self.dec_seq_len_width, 8, 8, 128])
+            #self.dec_img = tf.reshape(self.dec_img, [self.seq_len_height, self.dec_seq_len_width, ])
         '''
         with tf.variable_scope('decode'):
             dec_cell = tf.nn.rnn_cell.LSTMCell(self.config.hidden_size)
@@ -136,3 +167,4 @@ class Model(object):
         #    tf.get_variable("wi", shape=[512, self.config.hidden_size])
 
         #emit_ta, final_state, final_loop_state = tf.nn.raw_rnn(cell = cell, loop_fn = crnn_loop_fn)
+	'''

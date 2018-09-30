@@ -31,17 +31,27 @@ def train(config):
         writer = tf.summary.FileWriter(config.train_log_dir)
         saver = tf.train.Saver()
         train_handle = sess.run(train_iterator.string_handle())
-        sess.run(tf.assign(model.is_train, tf.constant(True, dtype=tf.bool)))
+        #sess.run(tf.assign(model.is_train, tf.constant(True, dtype=tf.bool)))
 
         for _ in tqdm(range(1, config.num_steps + 1)):
             global_step = sess.run(model.global_step) + 1
-            enc_img, res_img, img_info, end_width= sess.run(
-                [model.enc_img, model.res_img, model.img_info, model.end_width], 
+            res_img = sess.run([model.res_img], feed_dict={handle: train_handle})
+            print(np.shape(res_img))
+            
+            enc_img, dec_img, res_img, fin_state, fin_output, emit_ta, img_info, end_width = sess.run( 
+                [model.enc_img_, model.dec_img_, model.res_img_, model.fin_state, model.fin_output, model.emit_ta, model.img_info, model.end_width], 
                 feed_dict={handle: train_handle})
+            
             print('========================')
+            print('Image Width    :', img_info[2])
+            print('Image Height   :', img_info[3])
+            print('End Width      :', end_width)
             print('Encoding Image :', np.shape(enc_img))
+            print('Decoding Image :', np.shape(dec_img))
             print('ResNet   Image :', np.shape(res_img))
-            print('Model Info :', img_info)
-            print('End Width :', end_width)
-            print(end_width)
+            print('RNN Fin  State :', np.shape(fin_state))
+            print('RNN Fin Output :', np.shape(fin_output))
+            print('Emit_ta Output :', np.shape(emit_ta))
+            #print('Model Info :', img_info)
+            #print(end_width)
             print('========================')
