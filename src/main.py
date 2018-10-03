@@ -35,13 +35,27 @@ def train(config):
         total_loss = 0.0
         
         sess.run(tf.assign(model.lr, tf.constant(lr, dtype=tf.float32)))
-        
-        for _ in tqdm(range(1, config.num_steps + 1)):
-            global_step = sess.run(model.global_step) + 1
+        cnt = 0
+        stack_grads = None
+        for step in tqdm(range(1, config.num_steps + 1)):
+            loss, grads = sess.run( [model.loss, model.grads], feed_dict={handle: train_handle})# , model.stack_grads : 0} )
+            if cnt == 0:
+                stack_grads = grads
+            else:
+                stack_grads += grads
+            print('loss stack :',loss)
             
-            loss = sess.run( [model.loss ], feed_dict={handle: train_handle, model.total_loss : 0} )
-            print(loss)
-            total_loss += loss[0]
+            if step % config.stack_batch == 0:
+                print('\n\n\n\nStack loss Learning\n\n\n\n')
+                result = list()
+                for grads in stack_grads:
+                    result.append( grads / config.stack_batch)
+                tmp_dict = {handle:train_handle}
+                for i, grad in enumerate(result):
+                    print(i, type(grad), np.shape(grad))
+                    tmp_dict[model.stack_grads[i]] = grad
+                train_op = sess.run( [model.train_op], feed_dict=tmp_dict )
+            #total_loss += loss[0]
             '''
             if (global_step+1) % config.stack_batch == 0:
                 print(total_loss)

@@ -54,6 +54,7 @@ flags.DEFINE_integer("capacity", 1000, "Loaded datset to ram")
 flags.DEFINE_integer("num_threads", 4, "Number of thread for input pipeline")
 flags.DEFINE_boolean("use_cudnn",False, "Wheater to use GPU or CPU")
 flags.DEFINE_integer("batch_size", 1, "batch_size")
+flags.DEFINE_integer("stack_batch",32, "stack_batch")
 
 flags.DEFINE_integer('num_steps', 10000, "Steps of iteration")
 flags.DEFINE_integer("epoch", 40, "Number of Epoch")
@@ -66,7 +67,7 @@ flags.DEFINE_integer('block_size', 32, "Size of Picture partitioning Block")
 
 # -------------------- Model realted Flags --------------------
 flags.DEFINE_float("grad_clip", 5.0, "Global Norm gradient clipping rate")
-flags.DEFINE_integer('hidden_size', 8192, "RNN hidden_size")
+flags.DEFINE_integer('hidden_size', 300, "RNN hidden_size")
 flags.DEFINE_integer('cut_size', 4, "Cutting size of conved data")
 # -------------------------------------------------------------
 

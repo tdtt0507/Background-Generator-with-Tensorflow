@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from func import conv, bn, stack, _max_pool, activation, deconv2d, binary_crossentropy
 from rnn import my_dynamic_rnn
-
+from pprint import pprint
 class Model(object):
     
     def __init__(self, config, batch, is_train):
@@ -24,7 +24,6 @@ class Model(object):
         self.c_image = tf.reshape(self.c_image, [self.img_info[3], self.img_info[2], 3])
         self.r_image = tf.reshape(self.r_image, [self.img_info[3], self.img_info[2], 3])
         self.lr = tf.get_variable("lr", shape=[], dtype=tf.float32, trainable=False)
-        self.total_loss = tf.placeholder(tf.float32, [])
         print('Getting batch part Builded')
 
         print('Cutting & Copy Part Building ... ')
@@ -171,6 +170,7 @@ class Model(object):
             
             self.emit_ta = emit_ta.stack()
             self.emit_ta = tf.transpose(self.emit_ta, [1,0,2])
+            self.emit_ta = tf.layers.dense(self.emit_ta, 8192, tf.nn.relu)
             self.emit_ta = tf.reshape(self.emit_ta, [self.seq_len_height, self.dec_seq_len_width, 8, 8, 128])
             
     def deconv(self):
@@ -199,7 +199,10 @@ class Model(object):
         
         capped_grads, _ = tf.clip_by_global_norm(
             gradients, self.config.grad_clip)
-        
+        self.grads = capped_grads
+        pprint(capped_grads)
+        self.stack_grads = [tf.placeholder(dtype=tf.float32) for _ in range(len(capped_grads)) ]#tf.placeholder_with_default(capped_grads,[1,51])
+        pprint(self.stack_grads)
         self.train_op = self.opt.apply_gradients(
-            zip(capped_grads, variables), global_step=self.global_step)
+            zip(self.stack_grads, variables), global_step=self.global_step)
         
