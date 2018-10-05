@@ -15,7 +15,7 @@ dev_dir   = os.path.join('..','data','image_data','dev_data')  # validation data
 test_dir  = os.path.join('..','data','image_data','test_data')
 processed_dir = os.path.join('..','data','processed_data')      # processed data 
 
-target = "yongho_BG_with_attention"
+target = "BG_v01"
 target_dir = os.path.join('..','data','research_data',target)
 model_ckpt_dir = os.path.join('..','data','research_data',target,'model_ckpt')
 train_log_dir = os.path.join('..','data','research_data',target,'train_log')
@@ -50,16 +50,16 @@ flags.DEFINE_string("train_record_file", train_record_file, "")
 flags.DEFINE_string("dev_record_file", dev_record_file, "")
 flags.DEFINE_string("test_record_file", test_record_file, "")
 
-flags.DEFINE_integer("capacity", 1000, "Loaded datset to ram")
+flags.DEFINE_integer("capacity", 300, "Loaded datset to ram")
 flags.DEFINE_integer("num_threads", 4, "Number of thread for input pipeline")
 flags.DEFINE_boolean("use_cudnn",False, "Wheater to use GPU or CPU")
 flags.DEFINE_integer("batch_size", 1, "batch_size")
 flags.DEFINE_integer("stack_batch",32, "stack_batch")
 
-flags.DEFINE_integer('num_steps', 10000, "Steps of iteration")
+flags.DEFINE_integer('num_steps',32* 100000, "Steps of iteration")
 flags.DEFINE_integer("epoch", 40, "Number of Epoch")
 flags.DEFINE_integer("check_point",1000,"Checkpoint per step")
-flags.DEFINE_float("init_lr", 0.5, "Initial Learning rate for adadelta")
+flags.DEFINE_float("init_lr", 0.0001, "Initial Learning rate for adadelta")
 flags.DEFINE_float("keep_prob", 0.7,"Dropout rate")
 flags.DEFINE_integer("patience", 3, "Patience for lr decay")
 

@@ -214,19 +214,35 @@ def make_tf_record(dataset, kind):
         print(data)
         origin = Image.open(os.path.join(dataset + '/original', data[0])) # Original Image
         chked  = Image.open(os.path.join(dataset + '/original', data[1])) # object detected Image        
-        obj_info = detect_object(chked) # obj_info = [y, x, width, height]
-        obj_info_ = {'x':obj_info[1],'y':obj_info[0],'w':obj_info[2],'h':obj_info[3]}
-        obj_info = obj_info_
-        ## 기본적인 생성방식, N 개의 image 를 random 방식으로 잘라서 data 를 augment
-        N = 10 # 데이터 증강 개수
-        tmp_tf, cnt = augment_image(dataset + '/augment', origin, obj_info, N, cnt)             
-        input_tf += tmp_tf
-        N = 10
+        try:
+            shp = np.shape(origin)
+            if shp[0] < 500 or shp[1] < 500:
+                print('Not enough size of Picture')
+                continue
+            obj_info = detect_object(chked) # obj_info = [y, x, width, height]
+            obj_info_ = {'x':obj_info[1],'y':obj_info[0],'w':obj_info[2],'h':obj_info[3]}
+            obj_info = obj_info_
+            ## 기본적인 생성방식, N 개의 image 를 random 방식으로 잘라서 data 를 augment
+            N = 10 # 데이터 증강 개수
+            tmp_tf, cnt = augment_image(dataset + '/augment', origin, obj_info, N, cnt)             
+            input_tf += tmp_tf
+            N = 10
+        except:
+            print('Error Data :',data)
     return input_tf
 
-def produce_tfrecord(config, examples):
+def produce_tfrecord(config, examples, loc):
     print('Generating train.tfrecord')
-    writer = tf.python_io.TFRecordWriter(config.train_record_file)    
+    if loc == 'train':
+        print('Generating train.tfrecord')
+        writer = tf.python_io.TFRecordWriter(config.train_record_file)    
+
+    elif loc == 'dev':
+        print('Generating dev.tfrecord')
+        writer = tf.python_io.TFRecordWriter(config.dev_record_file)
+
+    else:
+        raise ValueError
     for example in examples:
         print(example)
         img_x = Image.open(example['X'])
@@ -261,7 +277,8 @@ def produce_tfrecord(config, examples):
                 end_width = idx
                 break
         img_info = np.array( [0,0, len(np_x[0]), len(np_x) ], dtype=np.int32)
-        
+        if img_info[2] < 80 or img_info[3] < 80 or end_width < 50:
+            continue
         features = tf.train.Features(feature={
             # 실제 이미지 Location
             "id" : tf.train.Feature(int64_list=tf.train.Int64List(value=[example['id']])),
@@ -285,5 +302,7 @@ def prepro(config):
     # prepro 모듈 동작 시나리오
 
     train_input_tf = make_tf_record(train_dir,"Training data")
-    produce_tfrecord(config, train_input_tf)
+    produce_tfrecord(config, train_input_tf, 'train')
+    dev_input_tf = make_tf_record(dev_dir, "Dev Data")
+    produce_tfrecord(config, dev_input_tf, 'dev')
     

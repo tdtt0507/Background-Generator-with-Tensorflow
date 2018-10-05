@@ -172,3 +172,42 @@ def deconv2d(input_, output_dim, ks=5, s=2, stddev=0.02, name="deconv2d"):
 def binary_crossentropy(t,o):
     eps=1e-8
     return -(t*tf.log(o+eps) + (1.0-t)*tf.log(1.0-o+eps))
+
+def y_loss(x,y):
+    loss = tf.abs( x - y )
+    loss = tf.pow(loss, 2)
+    loss = tf.reshape(loss, [-1] )
+    loss = tf.reduce_mean(loss)
+    return loss
+
+# pixelwise vector normalization
+def pixel_norm(x, epsilon=1e-8):
+    with tf.variable_scope('PixelNorm', reuse=tf.AUTO_REUSE):
+        norm_x = x * tf.rsqrt(tf.reduce_mean(tf.square(x), axis=1, keepdims=True) + epsilon)
+        return norm_x
+
+# activation function
+def lrelu(x, leak=0.2, name="lrelu"):
+    return tf.maximum(x, leak * x)
+
+
+# loss함수
+def bce(o, t):
+    o = tf.clip_by_value(o, 1e-7, 1. - 1e-7)
+    return tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=o, labels=t))
+
+
+
+# slim.conv2d -> filter를 shape에 맞춰서 다 만들고 w값 초기화하는 과정 생략
+def conv2d(input_, output_dim, ks=4, s=2, stddev=0.02, padding='SAME', name="conv2d"):
+    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+        input_ = tf.cast(input_, tf.float32)
+        print(input_)
+        print(output_dim)
+        print(ks)
+        print(s)
+        
+        x = slim.conv2d(input_, output_dim, ks, s, padding=padding, activation_fn=None,
+                           weights_initializer=tf.truncated_normal_initializer(stddev=stddev),  biases_initializer= None)
+        return x
+
